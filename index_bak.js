@@ -2,12 +2,9 @@ const fs = require('fs')
 const xml2js = require('xml2js')
 const TurndownService = require('turndown')
 
-// Track used filenames per notebook directory to handle duplicates
-const usedFileNames = new Map()
-
 async function main(inputFile) {
   const xml = fs.readFileSync(process.argv[2])
-  const js = await(xml2js.parseStringPromise(xml))
+  const js = await(xml2js.parseStringPromise(xml));
   try {
     const notes = mapNotes(js['nixnote-export'])
     turndownService.use(enMediaPlugin(notes)) // handle embedded media
@@ -32,15 +29,13 @@ function mapNotes(evernote) {
 
   const notes = evernote['Note']
   return notes.reduce((arr, noteDom) => {
-    const note = new Note(noteDom, notebookNamesByGuid.get(noteDom['NotebookGuid'][0]))
+    const note = new Note(noteDom, notebookNamesByGuid.get(noteDom['NotebookGuid'][0]));
     return [...arr, note]
   }, [])
 }
 
 function writeNoteToFile(note) {
   let markdown = turndownService.turndown(note.content)
-  // Remove unwanted escaping of periods and square brackets
-  markdown = markdown.replace(/\\([.\[\]\(\)\*\`\+\-\!\_\#{}])/g, '$1')
   markdown = markdown.replace(/\n\s+\n/g, '\n\n') // trim whitespace-only lines
   markdown = markdown.replace(/\n{3,}/g, '\n\n') // never need more than 2 line breaks
   markdown = markdown.replace(/\n\\\*/g, '*') // Asterisks at the beginning of the line were probably intentional
@@ -52,60 +47,26 @@ function writeNoteToFile(note) {
 }
 
 function saveResourcesAsFiles(note) {
-  // Get the unique filename used for the note (without .md extension)
-  const noteFileName = getUniqueFileName(note.notebook.name, `${note.title}.md`).replace(/\.md$/, '')
   for(const resource of note.resources) {
-    // Save resources in a subdirectory named after the note to avoid conflicts
-    const resourceDir = `${note.notebook.name}/assets/${noteFileName}`
-    writeFile(resourceDir, resource.fileName, resource.data.bytes)
+    writeFile(`${note.notebook.name}/assets/`, resource.fileName, resource.data.bytes)
   }
-}
-
-// Generate a unique filename by appending a counter if needed
-function getUniqueFileName(dir, fileName) {
-  if (!usedFileNames.has(dir)) {
-    usedFileNames.set(dir, new Set())
-  }
-  const used = usedFileNames.get(dir)
-  let baseName = fileName
-  let counter = 0
-  let uniqueName = fileName
-
-  // Remove extension to handle counter appending
-  const extension = fileName.match(/\.[^.]+$/)?.[0] || ''
-  const nameWithoutExt = fileName.replace(/\.[^.]+$/, '')
-
-  // Check if the filename is already used and generate a new one if needed
-  while (used.has(uniqueName)) {
-    counter++
-    uniqueName = `${nameWithoutExt}_${counter}${extension}`
-  }
-
-  used.add(uniqueName)
-  return uniqueName
 }
 
 function writeFile(dir, fileName, data) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+  if(!fs.existsSync(dir)) {
+    fs.mkdirSync(dir)
   }
-  // Get a unique filename to avoid overwriting
-  const uniqueFileName = getUniqueFileName(dir, fileName)
   // Windows has more restrictions, but I use Linux
-  const cleanedFileName = uniqueFileName.replace(/\//g, '_')
+  const cleanedFileName = fileName.replace(/\//g, '_')
   fs.writeFileSync(`${dir}/${cleanedFileName}`, data)
 }
 
 // Turndown converts HTML to JSON, and works fine with the XML note content.
 const turndownService = new TurndownService({
+  // These are just my personal preferences
   bulletListMarker: '-',
-  emDelimiter: '*'
+  emDelimiter: '*',
 })
-
-// Override Turndown's escape function to exclude periods and square brackets
-turndownService.escape = function(str) {
-  return str.replace(/([*_+`(){}#+\-!])/g, '\\$1')
-}
 
 /*
 This creates a Turndown plugin that is aware of all the notes in our file.
@@ -154,11 +115,7 @@ class Note {
     this.title = noteDom['Title'][0]
     this.notebook = notebook
     this.content = noteDom['Content'][0]
-    // Initialize attributes from <Attributes> sub-element
-    this.attributes = noteDom['Attributes']?.[0] ?? {}
-    // Add Created and Updated from top-level <Note> elements
-    this.attributes.Created = noteDom['Created']?.[0] ?? 'Unknown'
-    this.attributes.Updated = noteDom['Updated']?.[0] ?? 'Unknown'
+    this.attributes = noteDom['Attributes']?.[0] ?? []
     this.resources = noteDom['NoteResource']
       ?.map(noteResourceDom => new NoteResource(noteResourceDom))
       ?.reduce((arr, resource) => [...arr, resource], [])
@@ -192,9 +149,9 @@ class Data {
     // 'body' is a string of hexadecimal characters
     // this converts it to an array of byte ints
     for (let c = 0; c < this.body.length; c += 2) {
-      bytes.push(parseInt(this.body.substr(c, 2), 16))
+      bytes.push(parseInt(this.body.substr(c, 2), 16));
     }
-    return new Uint8Array(bytes)
+    return new Uint8Array(bytes);
   }
 }
 
